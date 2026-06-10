@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Dashboard</title>
+  </head>
+  <body style="font-family: ui-sans-serif, system-ui; padding:24px;">
+    <h1>Dashboard (Démo)</h1>
+    <div id="kpis"></div>
+    <script>
+      fetch('http://localhost:4000/api/v1/dashboard')
+        .then(r=>r.json())
+        .then(d=>{ document.getElementById('kpis').innerText = JSON.stringify(d,null,2); })
+        .catch(()=>{ document.getElementById('kpis').innerText='API indisponible'; });
+    </script>
+    <p><a href="/">Retour</a></p>
+  </body>
+</html>

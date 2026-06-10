@@ -1,0 +1,1685 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  contributeur
+  lecteur
+}
+
+enum UserStatus {
+  actif
+  inactif
+  suspendu
+}
+
+enum ProcessusStatut {
+  brouillon
+  en_revision
+  valide
+  actif
+  archive
+  obsolete
+}
+
+enum DocType {
+  processus
+  projet
+  general
+  procedure
+  formulaire
+  contrat
+  client_fournisseur
+  template
+  tache
+  licence
+  autre
+  pv_reunion
+  epic
+  user_story
+}
+
+enum RefType {
+  processus
+  projet
+  entite
+  clientFournisseur
+  licence
+  pvReunion
+  epic
+  userStory
+}
+
+enum DocStatut {
+  brouillon
+  en_revision
+  valide
+  archive
+}
+
+enum LogAction {
+  connexion
+  deconnexion
+  lecture
+  creation
+  modification
+  suppression
+  telechargement
+  export
+}
+
+enum ResourceType {
+  processus
+  projet
+  document
+  entite
+  utilisateur
+  licence
+  clientFournisseur
+  contrat
+  tache
+  epic
+  userStory
+  pvReunion
+}
+
+enum PermissionResource {
+  processus
+  projet
+  document
+  entite
+  clientFournisseur
+}
+
+enum PermissionType {
+  lecture
+  modification
+  suppression
+  gestion
+}
+
+/// Modules de navigation / écrans principaux (override par utilisateur)
+enum UiModule {
+  dashboard
+  processus
+  projets
+  taches
+  clients_fournisseurs
+  contrats
+  ocr
+  licences
+  entites
+  documents
+  pv_reunion
+  users
+  journal
+  configuration
+  corbeille
+}
+
+enum UiModuleLevel {
+  none
+  lecture
+  modification
+}
+
+model User {
+  id               String      @id @default(uuid())
+  email            String      @unique
+  passwordHash     String
+  nom              String
+  prenom           String
+  /// Fonction ou poste occupé (facultatif)
+  fonction         String?
+  role             Role        @default(contributeur)
+  avatarUrl        String?
+  statut           UserStatus  @default(actif)
+  derniereConnexion DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  // Relations existantes
+  processusProprietaire Processus[] @relation("ProcessusProprietaire")
+  processusCreatedBy    Processus[] @relation("ProcessusCreatedBy")
+  documentsUploaded     Document[]
+  documentsValides      Document[]  @relation("DocumentValidePar")
+  versionsDocuments     VersionDocument[] @relation("VersionDocumentUploadedBy")
+  permissions           Permission[] @relation("PermissionUser")
+  permissionsGranted    Permission[] @relation("PermissionGrantedBy")
+  documentPermissions    DocumentPermission[] @relation("DocumentPermissionUser")
+  documentsAdminSansAcces DocumentAdminSansAcces[] @relation("DocumentAdminSansAcces")
+  journalAcces          JournalAcces[]
+  entitesResponsable    Entite[]    @relation("EntiteResponsable")
+  entitesMembres        UserEntite[]
+  passwordResetTokens   PasswordResetToken[]
+  documentComments      DocumentComment[]
+  smtpConfigsUpdated    SMTPConfig[] @relation("SMTPConfigUpdatedBy")
+  favorisProcessus      FavorisProcessus[]
+  favorisDocuments      FavorisDocument[]
+
+  // NOUVEAU - Relations projets gouvernance
+  projetsSponsor        ProjetSponsor[]
+  projetsChefProjet     ProjetChefProjet[]
+  projetsCreatedBy      Projet[]    @relation("ProjetCreatedBy")
+  projetsResponsable    Projet[]    @relation("ProjetResponsable")
+  projetsGestionnaire   Projet[]    @relation("ProjetGestionnaire")
+  projetsTechLead       ProjetTechLead[]
+  projetsEquipe         ProjetEquipe[]
+
+  @@index([email])
+  contratsCreated       Contrat[]              @relation("ContratCreatedBy")
+  contratPermissions    ContratPermission[]    @relation("ContratPermission")
+  contratsAdminSansAcces ContratAdminSansAcces[] @relation("ContratAdminSansAcces")
+  tachesCreees          Tache[]                @relation("TacheCreateur")
+  tachesAssignees       TacheUser[]            @relation("TacheAssigneUser")
+  tachesAdminSansAcces  TacheAdminSansAcces[]  @relation("TacheAdminSansAcces")
+  epicsCrees            Epic[]                 @relation("EpicCreatedBy")
+  epicPermissions       EpicPermission[]       @relation("EpicPermissionUser")
+  epicsAdminSansAcces   EpicAdminSansAcces[]   @relation("EpicAdminSansAcces")
+  userStoriesCreees     UserStory[]            @relation("UserStoryCreatedBy")
+  userStoryPermissions  UserStoryPermission[]  @relation("UserStoryPermissionUser")
+  userStoriesAdminSansAcces UserStoryAdminSansAcces[] @relation("UserStoryAdminSansAcces")
+  tacheCommentaires     TacheCommentaire[]     @relation("TacheCommentaireUser")
+  epicCommentaires      EpicCommentaire[]      @relation("EpicCommentaireUser")
+  userStoryCommentaires UserStoryCommentaire[] @relation("UserStoryCommentaireUser")
+  notifications         Notification[]         @relation("NotificationUser")
+  notificationEmailFailuresAsRecipient NotificationEmailFailure[] @relation("NotificationEmailFailureUser")
+
+  licencesCreees              Licence[]              @relation("LicenceCreatedBy")
+  licencePermissions        LicencePermission[]
+  licencesAdminSansAcces    LicenceAdminSansAcces[] @relation("LicenceAdminSansAcces")
+  licenceCommentaires       LicenceCommentaire[]   @relation("LicenceCommentaireAuteur")
+  licenceCommentairesAssignes LicenceCommentaire[] @relation("LicenceCommentaireAssigne")
+
+  clientsFournisseursCrees       ClientFournisseur[]              @relation("ClientFournisseurCreatedBy")
+  clientFournisseurHistorique    ClientFournisseurHistorique[]
+  contratHistorique              ContratHistorique[]
+  entitesCreees                  Entite[]                         @relation("EntiteCreatedBy")
+
+  projetsAdminSansAcces             ProjetAdminSansAcces[]             @relation("ProjetAdminSansAcces")
+  processusAdminSansAcces           ProcessusAdminSansAcces[]          @relation("ProcessusAdminSansAcces")
+  clientsFournisseursAdminSansAcces ClientFournisseurAdminSansAcces[]  @relation("ClientFournisseurAdminSansAcces")
+  entitesAdminSansAcces             EntiteAdminSansAcces[]             @relation("EntiteAdminSansAcces")
+
+  userUiModuleAccesses          UserUiModuleAccess[]
+
+  pvReunionsCrees               PvReunion[]              @relation("PvReunionCreatedBy")
+  pvReunionPermissions          PvReunionPermission[]    @relation("PvReunionPermission")
+  pvReunionsAdminSansAcces      PvReunionAdminSansAcces[] @relation("PvReunionAdminSansAcces")
+  pvReunionPresents             PvReunionPresentUser[]
+  pvReunionModificationDelegues PvReunionModificationDelegue[]
+  pvReunionCommentairesAuteur   PvReunionCommentaire[]   @relation("PvReunionCommentaireAuteur")
+  pvReunionCommentairesAssignes PvReunionCommentaire[]   @relation("PvReunionCommentaireAssigne")
+  pvReunionContenuVersions      PvReunionContenuVersion[] @relation("PvReunionContenuVersionAuteur")
+}
+
+model UserUiModuleAccess {
+  id        String         @id @default(uuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module    UiModule
+  level     UiModuleLevel
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([userId, module])
+  @@index([userId])
+}
+
+/// Types d'entité organisationnelle (configuration) — alimentent la liste « Type » lors de la création / modification d'entité.
+model TypeEntite {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  ordre     Int      @default(0)
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  entites   Entite[]
+}
+
+model Entite {
+  id                String      @id @default(uuid())
+  nom               String
+  typeEntiteId      String
+  typeEntite        TypeEntite  @relation(fields: [typeEntiteId], references: [id], onDelete: Restrict)
+  parentId          String?
+  parent            Entite?     @relation("EntiteHierarchie", fields: [parentId], references: [id], onDelete: Cascade)
+  children          Entite[]    @relation("EntiteHierarchie")
+  responsableId    String?
+  responsable      User?       @relation("EntiteResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  code              String      @unique
+  description      String?
+  createdById       String?
+  createdBy         User?       @relation("EntiteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  deletedAt         DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  // Relations
+  membres           UserEntite[]
+  processus         ProcessusEntite[]
+  projets           ProjetEntite[]
+  tachesAssignees   TacheEntite[]
+  epicEntites       EpicEntite[]
+  adminSansAcces    EntiteAdminSansAcces[]
+
+  @@index([parentId])
+  @@index([code])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([typeEntiteId])
+}
+
+/// Administrateurs explicitement privés d’accès implicite (aligné ContratAdminSansAcces).
+model EntiteAdminSansAcces {
+  id       String @id @default(uuid())
+  entiteId String
+  userId   String
+  entite   Entite @relation(fields: [entiteId], references: [id], onDelete: Cascade)
+  user     User   @relation("EntiteAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([entiteId, userId])
+  @@index([entiteId])
+  @@index([userId])
+}
+
+model UserEntite {
+  id                String      @id @default(uuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entiteId          String
+  entite            Entite      @relation(fields: [entiteId], references: [id], onDelete: Cascade)
+  createdAt         DateTime    @default(now())
+
+  @@unique([userId, entiteId])
+  @@index([userId])
+  @@index([entiteId])
+}
+
+model CategorieProcessus {
+  id                String      @id @default(uuid())
+  nom               String
+  description       String?
+  couleur           String?
+  icone             String?
+  parentId          String?
+  parent            CategorieProcessus? @relation("CategorieHierarchie", fields: [parentId], references: [id], onDelete: Cascade)
+  children          CategorieProcessus[] @relation("CategorieHierarchie")
+  processus         ProcessusCategorie[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([parentId])
+}
+
+model Processus {
+  id                     String            @id @default(uuid())
+  nom                    String
+  codeProcessus          String            @unique
+  description            String?
+  tags                   String[]          @default([])
+  statut                 ProcessusStatut   @default(brouillon)
+  versionActuelle        String?
+  proprietaireId         String?
+  proprietaire           User?             @relation("ProcessusProprietaire", fields: [proprietaireId], references: [id], onDelete: SetNull)
+  dateValidation         DateTime?
+  dateProchaineRevision DateTime?
+  createdById            String?
+  createdBy              User?             @relation("ProcessusCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  deletedAt              DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  // Relations
+  entites                ProcessusEntite[]
+  categories             ProcessusCategorie[]
+  favoris                FavorisProcessus[]
+  licenceLiens LicenceProcessus[]
+  pvReunions             PvReunionProcessus[]
+  adminSansAcces         ProcessusAdminSansAcces[]
+
+  @@index([statut])
+  @@index([codeProcessus])
+  @@index([deletedAt])
+}
+
+/// Administrateurs explicitement privés d’accès implicite (aligné ContratAdminSansAcces).
+model ProcessusAdminSansAcces {
+  id          String    @id @default(uuid())
+  processusId String
+  userId      String
+  processus   Processus @relation(fields: [processusId], references: [id], onDelete: Cascade)
+  user        User      @relation("ProcessusAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([processusId, userId])
+  @@index([processusId])
+  @@index([userId])
+}
+
+model ProcessusCategorie {
+  id                String            @id @default(uuid())
+  processusId       String
+  processus         Processus        @relation(fields: [processusId], references: [id], onDelete: Cascade)
+  categorieId       String
+  categorie         CategorieProcessus @relation(fields: [categorieId], references: [id], onDelete: Cascade)
+  createdAt         DateTime          @default(now())
+
+  @@unique([processusId, categorieId])
+  @@index([processusId])
+  @@index([categorieId])
+}
+
+model ProcessusEntite {
+  id                String    @id @default(uuid())
+  processusId       String
+  processus         Processus @relation(fields: [processusId], references: [id], onDelete: Cascade)
+  entiteId          String
+  entite            Entite    @relation(fields: [entiteId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+
+  @@unique([processusId, entiteId])
+  @@index([processusId])
+  @@index([entiteId])
+}
+
+model Projet {
+  id                    String          @id @default(uuid())
+  nom                   String
+  codeProjet            String          @unique
+  description           String?
+  tags                  String[]        @default([])
+
+  // MODIFIÉ - Type étendu : interne | client | communautaire
+  type                  String          @default("interne")
+  nomClient             String?         // NOUVEAU - Nom du client si type = client
+
+  // MODIFIÉ - Statut étendu : en_preparation | en_cours | termine | en_pause
+  statut                String          @default("en_preparation")
+
+  // NOUVEAU - Priorité : haute | moyenne | basse
+  priorite              String          @default("moyenne")
+
+  dateDebut             DateTime?
+  dateFinPrevue         DateTime?
+  dateFinReelle         DateTime?
+  budgetPrevu           Decimal?        @db.Decimal(15, 2)
+  budgetConsomme        Decimal?        @db.Decimal(15, 2)
+  deviseId              String?
+  devise                Devise?         @relation(fields: [deviseId], references: [id], onDelete: SetNull)
+  responsableId         String?
+  gestionnaireId        String?
+  responsable           User?           @relation("ProjetResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  gestionnaire          User?           @relation("ProjetGestionnaire", fields: [gestionnaireId], references: [id], onDelete: SetNull)
+
+  // NOUVEAU - Contexte et description
+  contexte              String?
+  mission               String?
+  vision                String?
+  scopeInclus           String?
+  scopeExclus           String?
+
+  // NOUVEAU - Objectifs et KPIs (stockés en JSON)
+  objectifsStrategiques String?         // JSON: string[]
+  objectifsOperationnels String?        // JSON: string[]
+  kpis                  String?         // JSON: string[]
+
+  // NOUVEAU - Parties prenantes (JSON: [{type: string, nom: string}])
+  partiesPrenantes      String?
+
+  createdById           String?
+  createdBy             User?             @relation("ProjetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  deletedAt             DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  // Relations existantes
+  entites               ProjetEntite[]
+
+  // NOUVEAU - Relations gouvernance
+  sponsors              ProjetSponsor[]
+  chefsProjet           ProjetChefProjet[]
+  techLeads             ProjetTechLead[]
+  equipe                ProjetEquipe[]
+  clientsFournisseurs   ClientFournisseurProjet[]
+
+  @@index([statut])
+  @@index([codeProjet])
+  @@index([deletedAt])
+  contrats              ContratProjet[]
+  taches                Tache[]
+  epics                 Epic[]
+  pvReunions            PvReunionProjet[]
+  adminSansAcces        ProjetAdminSansAcces[]
+}
+
+/// Administrateurs explicitement privés d’accès implicite (aligné ContratAdminSansAcces).
+model ProjetAdminSansAcces {
+  id       String @id @default(uuid())
+  projetId String
+  userId   String
+  projet   Projet @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  user     User   @relation("ProjetAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projetId, userId])
+  @@index([projetId])
+  @@index([userId])
+}
+
+model ProjetEntite {
+  id                String    @id @default(uuid())
+  projetId          String
+  projet            Projet    @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  entiteId          String
+  entite            Entite    @relation(fields: [entiteId], references: [id], onDelete: Cascade)
+  roleEntite        String?
+  createdAt         DateTime  @default(now())
+
+  @@unique([projetId, entiteId])
+  @@index([projetId])
+  @@index([entiteId])
+}
+
+// NOUVEAU - Tables de gouvernance du projet
+model ProjetSponsor {
+  id        String   @id @default(uuid())
+  projetId  String
+  projet    Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([projetId, userId])
+  @@index([projetId])
+  @@index([userId])
+}
+
+model ProjetChefProjet {
+  id        String   @id @default(uuid())
+  projetId  String
+  projet    Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([projetId, userId])
+  @@index([projetId])
+  @@index([userId])
+}
+
+model ProjetTechLead {
+  id        String   @id @default(uuid())
+  projetId  String
+  projet    Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([projetId, userId])
+  @@index([projetId])
+  @@index([userId])
+}
+
+model ProjetEquipe {
+  id        String   @id @default(uuid())
+  projetId  String
+  projet    Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([projetId, userId])
+  @@index([projetId])
+  @@index([userId])
+}
+
+model Document {
+  id                  String      @id @default(uuid())
+  nom                 String
+  typeDocument        DocType
+  referenceId         String?
+  referenceType       RefType?
+  version             String?
+  versionMajeure      Int?        @default(1)
+  versionMineure      Int?        @default(0)
+  fichierUrl          String
+  fichierNomOriginal  String
+  fichierTaille       Int
+  fichierType         String
+  description         String?
+  statut              DocStatut   @default(brouillon)
+  estConfidentiel     Boolean     @default(false)
+  uploadedById        String
+  uploadedBy          User        @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  valideById          String?
+  valideBy            User?       @relation("DocumentValidePar", fields: [valideById], references: [id], onDelete: SetNull)
+  dateValidation      DateTime?
+  tags                Json?
+  texteOcr            String?  @db.Text
+  ocrTraite           Boolean  @default(false)
+  ocrDate             DateTime?
+  deletedAt           DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  // Relations
+  versions            VersionDocument[]
+  permissionsUtilisateurs DocumentPermission[]
+  adminSansAcces      DocumentAdminSansAcces[]
+  comments            DocumentComment[]
+  favoris             FavorisDocument[]
+  tacheDocuments      TacheDocument[]    @relation("DocumentTache")
+  epicDocuments       EpicDocument[]
+  pvReunionsPrincipal     PvReunion[]            @relation("PvReunionDocumentPrincipal")
+  pvReunionCommentPieces  PvReunionCommentaire[] @relation("PvReunionCommentairePiece")
+
+  @@index([referenceId, referenceType])
+  @@index([typeDocument])
+  @@index([statut])
+  @@index([deletedAt])
+  contrats              ContratDocument[]      @relation("DocumentContrat")
+  licenceDocuments      LicenceDocument[]
+}
+
+model VersionDocument {
+  id                String      @id @default(uuid())
+  documentId        String
+  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version           String
+  fichierUrl        String
+  commentaireVersion String?
+  uploadedById      String
+  uploadedBy        User        @relation("VersionDocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  createdAt         DateTime    @default(now())
+
+  @@index([documentId])
+}
+
+model DocumentPermission {
+  id                String      @id @default(uuid())
+  documentId        String
+  document          Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User        @relation("DocumentPermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime    @default(now())
+
+  @@unique([documentId, userId])
+  @@index([documentId])
+  @@index([userId])
+}
+
+/// Administrateurs privés d’accès implicite sur un document confidentiel « natif projet » (upload depuis la fiche projet).
+model DocumentAdminSansAcces {
+  id         String   @id @default(uuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation("DocumentAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([documentId, userId])
+  @@index([documentId])
+  @@index([userId])
+}
+
+model DocumentComment {
+  id                String   @id @default(uuid())
+  documentId        String
+  document          Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contenu           String
+  pieceJointeNom    String?
+  pieceJointePath   String?
+  pieceJointeType   String?
+  pieceJointeTaille Int?
+  createdAt         DateTime @default(now())
+
+  @@index([documentId])
+  @@index([userId])
+}
+
+model JournalAcces {
+  id                String        @id @default(uuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action            LogAction
+  ressourceType     ResourceType
+  ressourceId       String?
+  ressourceNom      String?
+  details           Json?
+  ipAddress         String?
+  userAgent         String?
+  timestamp         DateTime      @default(now())
+
+  @@index([userId])
+  @@index([ressourceType, ressourceId])
+  @@index([timestamp])
+  @@index([action])
+}
+
+model Permission {
+  id                String            @id @default(uuid())
+  userId            String
+  user              User              @relation("PermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  ressourceType     PermissionResource
+  ressourceId      String
+  permission       PermissionType
+  grantedById      String
+  grantedBy        User              @relation("PermissionGrantedBy", fields: [grantedById], references: [id], onDelete: Restrict)
+  createdAt        DateTime          @default(now())
+
+  @@unique([userId, ressourceType, ressourceId, permission])
+  @@index([userId])
+  @@index([ressourceType, ressourceId])
+}
+
+model SMTPConfig {
+  id                String      @id @default(uuid())
+  host              String
+  port              Int
+  secure            Boolean     @default(false)
+  user              String
+  password          String
+  fromEmail         String
+  fromName          String?
+  isActive          Boolean     @default(false)
+  lastTestResult    Json?
+  lastTestAt        DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  updatedById       String?
+  updatedBy         User?       @relation("SMTPConfigUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([isActive])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model FavorisProcessus {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  processusId String
+  processus   Processus @relation(fields: [processusId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, processusId])
+  @@index([userId])
+  @@index([processusId])
+}
+
+model FavorisDocument {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, documentId])
+  @@index([userId])
+  @@index([documentId])
+}
+
+model TypeSociete {
+  id          String   @id @default(uuid())
+  nom         String   @unique
+  description String?
+  actif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  clientsFournisseurs ClientFournisseur[]
+}
+
+model ClientFournisseur {
+  id               String   @id @default(uuid())
+  type             String   // 'client' | 'fournisseur'
+  nom              String
+  logoUrl          String?
+  typeSocieteId    String?
+  typeSociete      TypeSociete? @relation(fields: [typeSocieteId], references: [id], onDelete: SetNull)
+  matriculeFiscale String?
+  adresse          String?
+  pays             String?
+  createdById      String?
+  createdBy        User?    @relation("ClientFournisseurCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  deletedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  representants    RepresentantLegal[]
+  projets          ClientFournisseurProjet[]
+  licenceLiens     LicenceClientFournisseur[]
+  historique       ClientFournisseurHistorique[]
+  pvReunionPresents PvReunionPresentClientFournisseur[]
+  adminSansAcces    ClientFournisseurAdminSansAcces[]
+  tachesAssignees   TacheClientFournisseur[]
+  epicsAssignees    EpicClientFournisseur[]
+}
+
+/// Administrateurs explicitement privés d’accès implicite (aligné ContratAdminSansAcces).
+model ClientFournisseurAdminSansAcces {
+  id                  String            @id @default(uuid())
+  clientFournisseurId String
+  userId              String
+  clientFournisseur   ClientFournisseur @relation(fields: [clientFournisseurId], references: [id], onDelete: Cascade)
+  user                User              @relation("ClientFournisseurAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clientFournisseurId, userId])
+  @@index([clientFournisseurId])
+  @@index([userId])
+}
+
+model ClientFournisseurHistorique {
+  id                  String            @id @default(uuid())
+  clientFournisseurId String
+  clientFournisseur   ClientFournisseur @relation(fields: [clientFournisseurId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  typeEvenement       String
+  libelle             String?
+  details             Json?
+  createdAt           DateTime          @default(now())
+
+  @@index([clientFournisseurId, createdAt])
+  @@index([userId])
+}
+
+model RepresentantLegal {
+  id                  String   @id @default(uuid())
+  clientFournisseurId String
+  clientFournisseur   ClientFournisseur @relation(fields: [clientFournisseurId], references: [id], onDelete: Cascade)
+  nom                 String
+  prenom              String
+  fonction            String?
+  email               String?
+  telephone           String?
+  statut              String   @default("en_exercice") // 'en_exercice' | 'fin_exercice'
+  dateDebut           DateTime?
+  dateFin             DateTime?
+  createdAt           DateTime @default(now())
+}
+
+model ClientFournisseurProjet {
+  id                  String   @id @default(uuid())
+  clientFournisseurId String
+  clientFournisseur   ClientFournisseur @relation(fields: [clientFournisseurId], references: [id], onDelete: Cascade)
+  projetId            String
+  projet              Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now())
+  @@unique([clientFournisseurId, projetId])
+}
+
+/// Types de contrat (configuration) — le « code » sert de préfixe dans la nomenclature [TYPE]-[ANNÉE]-[CLIENT]-[SÉQ].
+model TypeContrat {
+  id        String    @id @default(uuid())
+  code      String    @unique
+  libelle   String
+  createdAt DateTime  @default(now())
+  contrats  Contrat[]
+}
+
+model Contrat {
+  id                String   @id @default(uuid())
+  nom               String
+  /// Code métier unique (saisi ou généré : TYPE-ANNÉE-CLIENT-SÉQ)
+  codeContrat       String   @unique
+  typeContratId     String?
+  typeContrat       TypeContrat? @relation(fields: [typeContratId], references: [id], onDelete: Restrict)
+  dateSignature     DateTime?
+  dateEnregistrement DateTime?
+  dateExpiration    DateTime?
+  statut            String   @default("actif") // actif | expire | resilie | suspendu
+  tags              String?  // JSON array
+  createdById       String
+  createdBy         User     @relation("ContratCreatedBy", fields: [createdById], references: [id])
+  deletedAt         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  partiesPrenantes  ContratPartiePrenante[]
+  projets           ContratProjet[]
+  documents         ContratDocument[]
+  permissions       ContratPermission[]
+  adminSansAcces    ContratAdminSansAcces[]
+  licenceLiens      LicenceContrat[]
+  historique        ContratHistorique[]
+  pvReunions        PvReunionContrat[]
+
+  @@index([typeContratId])
+}
+
+model ContratAdminSansAcces {
+  id         String   @id @default(uuid())
+  contratId  String
+  contrat    Contrat  @relation(fields: [contratId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation("ContratAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([contratId, userId])
+  @@index([contratId])
+  @@index([userId])
+}
+
+model ContratHistorique {
+  id            String   @id @default(uuid())
+  contratId   String
+  contrat     Contrat  @relation(fields: [contratId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  typeEvenement String
+  libelle     String?
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([contratId, createdAt])
+  @@index([userId])
+}
+
+model ContratPartiePrenante {
+  id                  String   @id @default(uuid())
+  contratId           String
+  contrat             Contrat  @relation(fields: [contratId], references: [id], onDelete: Cascade)
+  nom                 String   // saisie manuelle OU nom du CF
+  clientFournisseurId String?  // optionnel si sélectionné depuis la liste
+  createdAt           DateTime @default(now())
+}
+
+model ContratProjet {
+  id        String   @id @default(uuid())
+  contratId String
+  contrat   Contrat  @relation(fields: [contratId], references: [id], onDelete: Cascade)
+  projetId  String
+  projet    Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([contratId, projetId])
+}
+
+model ContratDocument {
+  id         String   @id @default(uuid())
+  contratId  String
+  contrat    Contrat  @relation(fields: [contratId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document @relation("DocumentContrat", fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  @@unique([contratId, documentId])
+}
+
+model ContratPermission {
+  id        String   @id @default(uuid())
+  contratId String
+  contrat   Contrat  @relation(fields: [contratId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("ContratPermission", fields: [userId], references: [id], onDelete: Cascade)
+  niveau    String   // lecture | modification | suppression
+  createdAt DateTime @default(now())
+  @@unique([contratId, userId])
+}
+
+// ── TACHES ────────────────────────────────────────────────────────────────────
+
+enum TacheStatut {
+  cree
+  a_faire
+  en_cours
+  en_attente
+  bloque
+  termine
+  archive
+}
+
+enum LiaisonType {
+  concatenation
+  simple
+}
+
+/// Epic agile (regroupe des user stories et des tâches via les stories)
+model Epic {
+  id          String   @id @default(uuid())
+  nom         String
+  description String?
+  projetId    String
+  projet      Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy   User?    @relation("EpicCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  userStories                 UserStory[]
+  documents                   EpicDocument[]
+  assignesEntites             EpicEntite[]
+  assignesClientsFournisseurs EpicClientFournisseur[]
+  permissions                 EpicPermission[]
+  adminSansAcces              EpicAdminSansAcces[]
+  commentaires                EpicCommentaire[]
+  pvReunions                  PvReunionEpic[]
+
+  @@index([projetId])
+  @@index([deletedAt])
+}
+
+model EpicEntite {
+  id        String   @id @default(uuid())
+  epicId    String
+  epic      Epic     @relation(fields: [epicId], references: [id], onDelete: Cascade)
+  entiteId  String
+  entite    Entite   @relation(fields: [entiteId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([epicId, entiteId])
+  @@index([epicId])
+  @@index([entiteId])
+}
+
+model EpicClientFournisseur {
+  id                  String            @id @default(uuid())
+  epicId              String
+  epic                Epic              @relation(fields: [epicId], references: [id], onDelete: Cascade)
+  clientFournisseurId String
+  clientFournisseur   ClientFournisseur @relation(fields: [clientFournisseurId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now())
+
+  @@unique([epicId, clientFournisseurId])
+  @@index([epicId])
+  @@index([clientFournisseurId])
+}
+
+/// User story : epicId optionnel tant qu’elle n’est pas rattachée à un epic
+model UserStory {
+  id          String   @id @default(uuid())
+  description String
+  epicId      String?
+  epic        Epic?    @relation(fields: [epicId], references: [id], onDelete: SetNull)
+  createdById String?
+  createdBy   User?    @relation("UserStoryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  taches       Tache[]
+  permissions  UserStoryPermission[]
+  adminSansAcces UserStoryAdminSansAcces[]
+  commentaires UserStoryCommentaire[]
+  pvReunions   PvReunionUserStory[]
+
+  @@index([epicId])
+  @@index([deletedAt])
+}
+
+model EpicCommentaire {
+  id              String   @id @default(uuid())
+  epicId          String
+  epic            Epic     @relation(fields: [epicId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation("EpicCommentaireUser", fields: [userId], references: [id], onDelete: Cascade)
+  contenu         String
+  pieceJointeNom  String?
+  pieceJointePath String?
+  pieceJointeType String?
+  createdAt       DateTime @default(now())
+
+  @@index([epicId])
+  @@index([userId])
+}
+
+model UserStoryCommentaire {
+  id              String    @id @default(uuid())
+  userStoryId     String
+  userStory       UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User      @relation("UserStoryCommentaireUser", fields: [userId], references: [id], onDelete: Cascade)
+  contenu         String
+  pieceJointeNom  String?
+  pieceJointePath String?
+  pieceJointeType String?
+  createdAt       DateTime  @default(now())
+
+  @@index([userStoryId])
+  @@index([userId])
+}
+
+model EpicDocument {
+  id         String   @id @default(uuid())
+  epicId     String
+  epic       Epic     @relation(fields: [epicId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([epicId, documentId])
+  @@index([documentId])
+}
+
+model Tache {
+  id                  String        @id @default(uuid())
+  nom                 String
+  statut              TacheStatut   @default(cree)
+  tempsActifSecondes  Int           @default(0)
+  chronoActifDepuis   DateTime?
+  priorite            String        @default("basse")
+  complexite          String        @default("basse")
+  dateDebut           DateTime?
+  dateFinApprox       DateTime?
+  description         String?
+  scenarioExecution   String?
+  critereAcceptation  String?
+  projetId            String?
+  projet              Projet?       @relation(fields: [projetId], references: [id], onDelete: SetNull)
+  userStoryId         String?
+  userStory           UserStory?    @relation(fields: [userStoryId], references: [id], onDelete: SetNull)
+  createurId          String?
+  createur            User?         @relation("TacheCreateur", fields: [createurId], references: [id], onDelete: SetNull)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  deletedAt           DateTime?
+
+  assignesUtilisateurs        TacheUser[]
+  adminSansAcces              TacheAdminSansAcces[]
+  assignesEntites             TacheEntite[]
+  assignesClientsFournisseurs TacheClientFournisseur[]
+  liaisons                    TacheLiaison[] @relation("TacheLiaisonSource")
+  liaisonsVersMoi      TacheLiaison[] @relation("TacheLiaisonCible")
+  commentaires         TacheCommentaire[]
+  documents            TacheDocument[]
+  pvReunions           PvReunionTache[]
+
+  @@index([statut])
+  @@index([projetId])
+  @@index([createurId])
+  @@index([userStoryId])
+  @@index([deletedAt])
+}
+
+model TacheUser {
+  id         String         @id @default(uuid())
+  tacheId    String
+  tache      Tache          @relation(fields: [tacheId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User           @relation("TacheAssigneUser", fields: [userId], references: [id], onDelete: Cascade)
+  permission PermissionType @default(lecture)
+  createdAt  DateTime       @default(now())
+
+  @@unique([tacheId, userId])
+  @@index([tacheId])
+  @@index([userId])
+}
+
+model TacheAdminSansAcces {
+  id        String   @id @default(uuid())
+  tacheId   String
+  tache     Tache    @relation(fields: [tacheId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("TacheAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([tacheId, userId])
+  @@index([tacheId])
+  @@index([userId])
+}
+
+model TacheEntite {
+  id        String   @id @default(uuid())
+  tacheId   String
+  tache     Tache    @relation(fields: [tacheId], references: [id], onDelete: Cascade)
+  entiteId  String
+  entite    Entite   @relation(fields: [entiteId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([tacheId, entiteId])
+  @@index([tacheId])
+  @@index([entiteId])
+}
+
+model TacheClientFournisseur {
+  id                  String            @id @default(uuid())
+  tacheId             String
+  tache               Tache             @relation(fields: [tacheId], references: [id], onDelete: Cascade)
+  clientFournisseurId String
+  clientFournisseur   ClientFournisseur @relation(fields: [clientFournisseurId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now())
+
+  @@unique([tacheId, clientFournisseurId])
+  @@index([tacheId])
+  @@index([clientFournisseurId])
+}
+
+model TacheLiaison {
+  id          String      @id @default(uuid())
+  tacheId     String
+  tache       Tache       @relation("TacheLiaisonSource", fields: [tacheId], references: [id], onDelete: Cascade)
+  tacheLieeId String
+  tacheLiee   Tache       @relation("TacheLiaisonCible", fields: [tacheLieeId], references: [id], onDelete: Cascade)
+  type        LiaisonType @default(simple)
+  createdAt   DateTime    @default(now())
+
+  @@unique([tacheId, tacheLieeId])
+  @@index([tacheId])
+}
+
+model TacheCommentaire {
+  id              String   @id @default(uuid())
+  tacheId         String
+  tache           Tache    @relation(fields: [tacheId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation("TacheCommentaireUser", fields: [userId], references: [id], onDelete: Cascade)
+  contenu         String
+  pieceJointeNom  String?
+  pieceJointePath String?
+  pieceJointeType String?
+  createdAt       DateTime @default(now())
+
+  @@index([tacheId])
+  @@index([userId])
+}
+
+// ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  type      String   @default("mention")
+  titre     String
+  contenu   String
+  lienType  String?
+  lienId    String?
+  lue       Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([lue])
+}
+
+/// Activation par canal (email / in-app) pour les notifications métier — clés alignées sur l’écran Configuration.
+model NotificationSetting {
+  key           String   @id
+  emailEnabled  Boolean  @default(true)
+  appEnabled    Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
+}
+
+/// Emails automatiques (NotificationService) non délivrés — SMTP absent ou erreur d’envoi.
+model NotificationEmailFailure {
+  id           String   @id @default(uuid())
+  /// mention | assignation | statut | retard | nouvelle_tache_projet | commentaire | commentaire_pv | assignation_action_pv | document
+  kind         String
+  toEmail      String
+  toUserId     String?
+  toUser       User?    @relation("NotificationEmailFailureUser", fields: [toUserId], references: [id], onDelete: SetNull)
+  subject      String
+  htmlBody     String   @db.Text
+  errorMessage String   @db.Text
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([kind])
+}
+
+/// Jours fériés configurés depuis l'écran Configuration.
+model JourFerie {
+  id        String   @id @default(uuid())
+  /// Date au format jour (UTC minuit côté DB).
+  date      DateTime @unique
+  libelle   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+}
+
+// ── TACHE DOCUMENTS ───────────────────────────────────────────────────────────
+
+model TacheDocument {
+  id         String   @id @default(uuid())
+  tacheId    String
+  tache      Tache    @relation(fields: [tacheId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document @relation("DocumentTache", fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([tacheId, documentId])
+  @@index([tacheId])
+  @@index([documentId])
+}
+
+model EpicPermission {
+  id         String         @id @default(uuid())
+  epicId     String
+  epic       Epic           @relation(fields: [epicId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User           @relation("EpicPermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  permission PermissionType @default(lecture)
+  createdAt  DateTime       @default(now())
+
+  @@unique([epicId, userId])
+  @@index([epicId])
+  @@index([userId])
+}
+
+model EpicAdminSansAcces {
+  id        String   @id @default(uuid())
+  epicId    String
+  epic      Epic     @relation(fields: [epicId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("EpicAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([epicId, userId])
+  @@index([epicId])
+  @@index([userId])
+}
+
+model UserStoryPermission {
+  id          String         @id @default(uuid())
+  userStoryId String
+  userStory   UserStory      @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User           @relation("UserStoryPermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  permission  PermissionType @default(lecture)
+  createdAt   DateTime       @default(now())
+
+  @@unique([userStoryId, userId])
+  @@index([userStoryId])
+  @@index([userId])
+}
+
+model UserStoryAdminSansAcces {
+  id          String   @id @default(uuid())
+  userStoryId String
+  userStory   UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation("UserStoryAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([userStoryId, userId])
+  @@index([userStoryId])
+  @@index([userId])
+}
+
+// ── TYPE LICENCE ─────────────────────────────────────────────────────────────
+model TypeLicence {
+  id        String   @id @default(uuid())
+  nom       String   @unique
+  createdAt DateTime @default(now())
+}
+
+// ── DEVISES (licences, coûts) ────────────────────────────────────────────────
+model Devise {
+  id        String   @id @default(uuid())
+  code      String   @unique // ex. TND, EUR — valeur enregistrée sur la licence
+  libelle   String? // ex. Dinar tunisien
+  createdAt DateTime @default(now())
+  projets   Projet[]
+}
+
+// ── LICENCES ──────────────────────────────────────────────────────────────────
+
+model Licence {
+  id          String    @id @default(uuid())
+  nom         String
+  reference   String    @unique
+  typeLicence String
+  /// active | expiree | suspendue | cloturee
+  statut      String    @default("active")
+  cout        Decimal?  @db.Decimal(15, 2)
+  devise      String?
+  nombreSieges Int?
+  dateDebut   DateTime?
+  dateFin     DateTime?
+  description String?
+
+  createdById String?
+  createdBy   User?    @relation("LicenceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contratsLies              LicenceContrat[]
+  processusLies             LicenceProcessus[]
+  clientsFournisseursLies   LicenceClientFournisseur[]
+  permissions               LicencePermission[]
+  adminSansAcces            LicenceAdminSansAcces[]
+  documents                 LicenceDocument[]
+  commentaires              LicenceCommentaire[]
+  notifications             LicenceNotification[]
+
+  @@index([statut])
+  @@index([deletedAt])
+  @@index([createdById])
+}
+
+model LicenceAdminSansAcces {
+  id         String   @id @default(uuid())
+  licenceId  String
+  licence    Licence  @relation(fields: [licenceId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation("LicenceAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([licenceId, userId])
+  @@index([licenceId])
+  @@index([userId])
+}
+
+/// Liaison N-N licence ↔ contrat
+model LicenceContrat {
+  licenceId String
+  contratId String
+  licence   Licence @relation(fields: [licenceId], references: [id], onDelete: Cascade)
+  contrat   Contrat @relation(fields: [contratId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([licenceId, contratId])
+  @@index([contratId])
+}
+
+/// Liaison N-N licence ↔ processus
+model LicenceProcessus {
+  licenceId   String
+  processusId String
+  licence     Licence   @relation(fields: [licenceId], references: [id], onDelete: Cascade)
+  processus   Processus @relation(fields: [processusId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@id([licenceId, processusId])
+  @@index([processusId])
+}
+
+/// Liaison N-N licence ↔ client/fournisseur
+model LicenceClientFournisseur {
+  licenceId           String
+  clientFournisseurId String
+  licence             Licence           @relation(fields: [licenceId], references: [id], onDelete: Cascade)
+  clientFournisseur   ClientFournisseur @relation(fields: [clientFournisseurId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now())
+
+  @@id([licenceId, clientFournisseurId])
+  @@index([clientFournisseurId])
+}
+
+model LicencePermission {
+  id        String   @id @default(uuid())
+  licenceId String
+  licence   Licence  @relation(fields: [licenceId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  niveau    String
+  createdAt DateTime @default(now())
+
+  @@unique([licenceId, userId])
+  @@index([licenceId])
+  @@index([userId])
+}
+
+model LicenceDocument {
+  id         String   @id @default(uuid())
+  licenceId  String
+  licence    Licence  @relation(fields: [licenceId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([licenceId, documentId])
+  @@index([licenceId])
+  @@index([documentId])
+}
+
+model LicenceCommentaire {
+  id          String   @id @default(uuid())
+  licenceId   String
+  licence     Licence  @relation(fields: [licenceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation("LicenceCommentaireAuteur", fields: [userId], references: [id], onDelete: Cascade)
+  contenu     String
+  assigneAId  String?
+  assigneUser User?    @relation("LicenceCommentaireAssigne", fields: [assigneAId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([licenceId])
+}
+
+model LicenceNotification {
+  id              String    @id @default(uuid())
+  licenceId       String
+  licence         Licence   @relation(fields: [licenceId], references: [id], onDelete: Cascade)
+  /// before_end | date_recurrence
+  mode            String    @default("before_end")
+  /// Si mode before_end : nombre de jours avant dateFin
+  joursAvant      Int       @default(30)
+  /// Ancre pour mode date_recurrence
+  dateAlerte      DateTime?
+  /// none | weekly | monthly | yearly
+  recurrence      String    @default("none")
+  active          Boolean   @default(true)
+  destinataireIds String[]  @default([])
+  lastSentAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([licenceId])
+}
+
+// ── PV DE RÉUNION ────────────────────────────────────────────────────────────
+
+model PvReunion {
+  id               String    @id @default(uuid())
+  titre            String
+  /// brouillon | en_revision | valide | archive
+  statut           String    @default("brouillon")
+  documentId       String
+  document         Document  @relation("PvReunionDocumentPrincipal", fields: [documentId], references: [id], onDelete: Restrict)
+  dateReunion      DateTime?
+  createdById      String
+  createdBy        User      @relation("PvReunionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  /// Sélection utilisateur (formulaire) : epicIds, userStoryIds, tacheIds, projetIds, contratIds, processusIds
+  liensExplicites  Json      @default("{}")
+  /// Contenu rédigé dans l’application (HTML), conservé pour édition / traçabilité
+  contenuHtml      String?   @db.Text
+  contenuUpdatedAt DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  presentsUser             PvReunionPresentUser[]
+  presentsClientFournisseur PvReunionPresentClientFournisseur[]
+  projets                  PvReunionProjet[]
+  taches                   PvReunionTache[]
+  userStories              PvReunionUserStory[]
+  epics                    PvReunionEpic[]
+  contrats                 PvReunionContrat[]
+  processus                PvReunionProcessus[]
+  modificationDelegues     PvReunionModificationDelegue[]
+  permissions              PvReunionPermission[]
+  adminSansAcces           PvReunionAdminSansAcces[]
+  commentaires             PvReunionCommentaire[]
+  contenuVersions          PvReunionContenuVersion[]
+
+  @@index([createdById])
+  @@index([documentId])
+  @@index([deletedAt])
+}
+
+/// Historique des versions du contenu HTML du PV (brouillons / sauvegardes).
+model PvReunionContenuVersion {
+  id            String    @id @default(uuid())
+  pvReunionId   String
+  pvReunion     PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  contenuHtml   String    @db.Text
+  createdById   String
+  createdBy     User      @relation("PvReunionContenuVersionAuteur", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt     DateTime  @default(now())
+
+  @@index([pvReunionId])
+  @@index([createdById])
+}
+
+model PvReunionPresentUser {
+  id          String    @id @default(uuid())
+  pvReunionId String
+  pvReunion   PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([pvReunionId, userId])
+  @@index([userId])
+}
+
+model PvReunionPresentClientFournisseur {
+  id                  String            @id @default(uuid())
+  pvReunionId         String
+  pvReunion           PvReunion         @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  clientFournisseurId String
+  clientFournisseur   ClientFournisseur @relation(fields: [clientFournisseurId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now())
+
+  @@unique([pvReunionId, clientFournisseurId])
+  @@index([clientFournisseurId])
+}
+
+model PvReunionProjet {
+  pvReunionId String
+  projetId    String
+  pvReunion   PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  projet      Projet    @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@id([pvReunionId, projetId])
+  @@index([projetId])
+}
+
+model PvReunionTache {
+  pvReunionId String
+  tacheId     String
+  pvReunion   PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  tache       Tache     @relation(fields: [tacheId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@id([pvReunionId, tacheId])
+  @@index([tacheId])
+}
+
+model PvReunionUserStory {
+  pvReunionId  String
+  userStoryId  String
+  pvReunion    PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  userStory    UserStory @relation(fields: [userStoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+
+  @@id([pvReunionId, userStoryId])
+  @@index([userStoryId])
+}
+
+model PvReunionEpic {
+  pvReunionId String
+  epicId      String
+  pvReunion   PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  epic        Epic      @relation(fields: [epicId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@id([pvReunionId, epicId])
+  @@index([epicId])
+}
+
+model PvReunionContrat {
+  pvReunionId String
+  contratId   String
+  pvReunion   PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  contrat     Contrat   @relation(fields: [contratId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@id([pvReunionId, contratId])
+  @@index([contratId])
+}
+
+model PvReunionProcessus {
+  pvReunionId String
+  processusId String
+  pvReunion   PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  processus   Processus @relation(fields: [processusId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@id([pvReunionId, processusId])
+  @@index([processusId])
+}
+
+model PvReunionModificationDelegue {
+  id          String    @id @default(uuid())
+  pvReunionId String
+  pvReunion   PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([pvReunionId, userId])
+  @@index([userId])
+}
+
+/// Accès partagés (mêmes règles que ContratPermission : lecture | modification | suppression)
+model PvReunionPermission {
+  id          String    @id @default(uuid())
+  pvReunionId String
+  pvReunion   PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation("PvReunionPermission", fields: [userId], references: [id], onDelete: Cascade)
+  niveau      String
+  createdAt   DateTime  @default(now())
+
+  @@unique([pvReunionId, userId])
+  @@index([pvReunionId])
+  @@index([userId])
+}
+
+/// Administrateurs explicitement privés d’accès implicite (comme ContratAdminSansAcces)
+model PvReunionAdminSansAcces {
+  id          String    @id @default(uuid())
+  pvReunionId String
+  pvReunion   PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation("PvReunionAdminSansAcces", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([pvReunionId, userId])
+  @@index([pvReunionId])
+  @@index([userId])
+}
+
+model PvReunionCommentaire {
+  id          String    @id @default(uuid())
+  pvReunionId String
+  pvReunion   PvReunion @relation(fields: [pvReunionId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation("PvReunionCommentaireAuteur", fields: [userId], references: [id], onDelete: Cascade)
+  contenu     String    @db.Text
+  assigneAId  String?
+  assigneUser User?     @relation("PvReunionCommentaireAssigne", fields: [assigneAId], references: [id], onDelete: SetNull)
+  documentId  String?
+  pieceJointe Document? @relation("PvReunionCommentairePiece", fields: [documentId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+
+  @@index([pvReunionId])
+  @@index([userId])
+  @@index([assigneAId])
+}

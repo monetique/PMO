@@ -1,0 +1,4 @@
+ALTER TABLE "Tache"
+ADD COLUMN "tempsActifSecondes" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "chronoActifDepuis" TIMESTAMP(3);
+

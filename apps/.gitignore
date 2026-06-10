@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Uploads utilisateurs
+api/uploads/
+
+# Backup files
+*.backup.*
+
+# Environment
+.env
+
+# Logs
+*.log
