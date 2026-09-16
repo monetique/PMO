@@ -136,9 +136,26 @@ async function getEntiteDescendantIds(rootIds: string[]): Promise<string[]> {
 }
 
 async function getContributeurProjetEntiteScope(userId: string): Promise<Set<string>> {
-  const ownEntites = await getUserEntiteIds(userId);
-  const scope = await getEntiteDescendantIds(ownEntites);
-  return new Set(scope);
+  // Règle métier :
+  // - Responsable d'entité → voit les projets de son entité + entités enfants
+  // - Simple membre → voit uniquement les projets de son entité directe
+  const directEntiteIds = await getUserDirectEntiteIds(userId);
+
+  // Entités dont l'user est responsable
+  const responsableEntites = await prisma.entite.findMany({
+    where: { responsableId: userId, deletedAt: null },
+    select: { id: true },
+  });
+  const responsableIds = responsableEntites.map((e: { id: string }) => e.id);
+
+  // Pour les entités où l'user est responsable → inclure les entités enfants
+  const childrenOfResponsable = responsableIds.length > 0
+    ? await getEntiteDescendantIds(responsableIds)
+    : [];
+
+  // Scope final : entités directes + entités enfants si responsable
+  const allIds = [...new Set([...directEntiteIds, ...childrenOfResponsable])];
+  return new Set(allIds);
 }
 
 function projetHasScopedEntite(
